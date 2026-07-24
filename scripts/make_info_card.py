@@ -4,7 +4,10 @@ SMIL animation only (CSS keyframes don't run reliably in GitHub's camo <img>
 sandbox). Static attributes are the final visible state, so with animations
 unavailable the card renders complete instead of blank.
 
-Height is exactly 348 to match hackerman.gif rendered at width 370 (200x188).
+Height is exactly 301 to match hackerman.gif (200x188) rendered at width 320.
+Widths are chosen so gif (320) + card (440) + table chrome fit inside GitHub's
+~790px profile README column WITHOUT max-width squeezing — a squeezed column
+scales one image and silently breaks the height match.
 """
 from pathlib import Path
 
@@ -13,12 +16,12 @@ OUT = Path(__file__).resolve().parent.parent / "info-card.svg"
 BG, BORDER = "#0d1117", "#30363d"
 FG, MUTED, GREEN = "#e6edf3", "#8b949e", "#7ee787"
 
-WIDTH, HEIGHT = 480, 348
-PAD = 22
-TITLEBAR = 34
-LINE_H = 24
-FONT_SIZE = 13
-CHAR_W = 7.8
+WIDTH, HEIGHT = 440, 301
+PAD = 20
+TITLEBAR = 32
+LINE_H = 19
+FONT_SIZE = 12
+CHAR_W = 7.2
 
 HEADER = "AriaCodez@github"
 FIELDS = [
@@ -107,7 +110,7 @@ def main() -> None:
 
     # prompt with an eternally blinking cursor, anchored to the card's bottom
     # edge so it lines up with the bottom of hackerman.gif next door
-    y = HEIGHT - 14
+    y = HEIGHT - 13
     delay += 0.5
     prompt = f'<tspan fill="{GREEN}">{HEADER}</tspan><tspan fill="{MUTED}"> ~ $</tspan>'
     parts.append(

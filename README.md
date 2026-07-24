@@ -5,8 +5,8 @@
 
 <table>
 <tr>
-<td valign="top"><img src="./hackerman.gif" width="370" alt="hackerman" /></td>
-<td valign="top"><img src="./info-card.svg" width="480" alt="Terminal-style info card" /></td>
+<td valign="top"><img src="./hackerman.gif" width="320" alt="hackerman" /></td>
+<td valign="top"><img src="./info-card.svg" width="440" alt="Terminal-style info card" /></td>
 </tr>
 </table>
 
