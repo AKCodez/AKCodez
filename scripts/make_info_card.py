@@ -38,12 +38,17 @@ FONT = "ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospac
 
 
 def reveal(delay: float, dur: float = 0.4) -> str:
-    """Fade-in hidden from t=0 until `delay`; degrades to visible if SMIL is off."""
+    """Fade-in hidden from ~t=0 until `delay`.
+
+    begin=0.01s (not 0) so a SMIL timeline paused at t=0 — which Chromium's
+    image cache produces sometimes — shows the visible base attributes
+    instead of freezing on the hidden first value. Degrades static, not blank.
+    """
     total = delay + dur
     k = max(delay / total, 0.0001)
     return (
-        f'<animate attributeName="opacity" dur="{total:.3f}s" values="0;0;1" '
-        f'keyTimes="0;{k:.4f};1" fill="freeze"/>'
+        f'<animate attributeName="opacity" begin="0.01s" dur="{total:.3f}s" '
+        f'values="0;0;1" keyTimes="0;{k:.4f};1" fill="freeze"/>'
     )
 
 

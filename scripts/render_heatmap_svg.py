@@ -42,12 +42,19 @@ FONT = "ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospac
 
 
 def reveal(delay: float, dur: float = 0.35) -> str:
-    """Fade-in that hides the element from t=0 until `delay`, no CSS needed."""
+    """Fade-in that hides the element from ~t=0 until `delay`, no CSS needed.
+
+    begin is 0.01s, NOT 0: Chromium sometimes hands GitHub's proxy a cached
+    SVG image whose SMIL timeline is paused at t=0. An animation active at
+    exactly 0 would freeze the element at values[0] (hidden) — with a tiny
+    begin offset the paused state shows the base attributes instead, i.e.
+    the finished static art. Never blank.
+    """
     total = delay + dur
     k = max(delay / total, 0.0001)
     return (
-        f'<animate attributeName="opacity" dur="{total:.3f}s" values="0;0;1" '
-        f'keyTimes="0;{k:.4f};1" fill="freeze"/>'
+        f'<animate attributeName="opacity" begin="0.01s" dur="{total:.3f}s" '
+        f'values="0;0;1" keyTimes="0;{k:.4f};1" fill="freeze"/>'
     )
 
 
@@ -57,7 +64,8 @@ def drop(delay: float) -> str:
     k = max(delay / total, 0.0001)
     return (
         f'<animateTransform attributeName="transform" type="translate" '
-        f'dur="{total:.3f}s" values="0 -14;0 -14;0 0" keyTimes="0;{k:.4f};1" '
+        f'begin="0.01s" dur="{total:.3f}s" values="0 -14;0 -14;0 0" '
+        f'keyTimes="0;{k:.4f};1" '
         f'calcMode="spline" keySplines="0 0 1 1;0.16 0.84 0.32 1" fill="freeze"/>'
     )
 
@@ -169,7 +177,7 @@ def main() -> None:
     parts.append(
         "<defs><clipPath id=\"typeclip\">"
         f'<rect x="{x0}" y="{fy - 13}" width="{text_w}" height="18">'
-        f'<animate attributeName="width" dur="{total_t:.3f}s" '
+        f'<animate attributeName="width" begin="0.01s" dur="{total_t:.3f}s" '
         f'values="0;0;{clip_vals[2:]}" keyTimes="{";".join(key_times)}" '
         f'calcMode="discrete" fill="freeze"/>'
         "</rect></clipPath></defs>"
