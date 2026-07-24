@@ -1,14 +1,15 @@
 """Render data/contributions.json as an animated terminal-style SVG heatmap.
 
-Animation is pure SMIL (<animate>/<animateTransform>) — CSS keyframe animations
-are NOT reliable inside GitHub's camo-proxied <img> sandbox, SMIL is.
-Every element's static attributes are its FINAL visible state, and reveals use
-the values="0;0;1" + keyTimes delay trick from t=0 — so if animations ever
-don't run, the whole graph degrades to fully-visible static instead of blank.
+Animation is pure SMIL — CSS keyframes never run behind GitHub's camo image
+proxy. Static attributes are always the finished visible state and reveals
+begin at 0.01s (never exactly 0), so paused or blocked timelines degrade to
+fully-visible static art instead of a blank panel.
 
-The show: matrix-style column rain reveals the grid behind a green scan beam,
-the beam keeps ghost-sweeping forever, bright cells shimmer, the total types
-itself out next to a blinking cursor.
+The show: a matrix-rain glyph layer drizzles behind everything forever, cells
+pop in with scale overshoot and a bright green flash as the wave sweeps left
+to right, a scan beam rides the reveal then ghost-sweeps on a 9s loop, bright
+cells shimmer, random cells twinkle with star glints, and the yearly total
+types itself out next to a blinking cursor.
 """
 import json
 from pathlib import Path
@@ -19,10 +20,12 @@ OUT = ROOT / "contrib-heatmap.svg"
 
 CELL, GAP = 13, 3
 PITCH = CELL + GAP
+HALF = CELL / 2
 
 LEVELS = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
 BG, BORDER = "#0d1117", "#30363d"
 MUTED, GREEN = "#8b949e", "#7ee787"
+FLASH = "#b6ffca"
 
 PAD = 20
 TITLEBAR = 34
@@ -30,10 +33,12 @@ GUTTER_LEFT = 34
 GUTTER_TOP = 22
 FOOTER = 44
 
-RAIN_DUR = 0.38          # per-cell drop time
+POP_DUR = 0.55           # per-cell pop time (scale 0 -> 1.35 -> 1)
 COL_STEP = 0.030         # delay per week column
 ROW_STEP = 0.055         # delay per weekday within a column
-SWEEP = 53 * COL_STEP + 6 * ROW_STEP + RAIN_DUR  # ≈ full reveal time
+SWEEP = 53 * COL_STEP + 6 * ROW_STEP + POP_DUR
+
+RAIN_CHARS = "0101010110ZEXA357F*+=-"  # XML-safe only: no < > &
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -42,14 +47,8 @@ FONT = "ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospac
 
 
 def reveal(delay: float, dur: float = 0.35) -> str:
-    """Fade-in that hides the element from ~t=0 until `delay`, no CSS needed.
-
-    begin is 0.01s, NOT 0: Chromium sometimes hands GitHub's proxy a cached
-    SVG image whose SMIL timeline is paused at t=0. An animation active at
-    exactly 0 would freeze the element at values[0] (hidden) — with a tiny
-    begin offset the paused state shows the base attributes instead, i.e.
-    the finished static art. Never blank.
-    """
+    """Fade-in hidden from ~t=0 until `delay`; paused timelines show the base
+    attributes (visible) because begin is 0.01s, not 0."""
     total = delay + dur
     k = max(delay / total, 0.0001)
     return (
@@ -58,15 +57,46 @@ def reveal(delay: float, dur: float = 0.35) -> str:
     )
 
 
-def drop(delay: float) -> str:
-    """Rain-drop: hold above the slot, then fall in with deceleration."""
-    total = delay + RAIN_DUR
-    k = max(delay / total, 0.0001)
+def matrix_rain(width: int, height: int, clip_id: str,
+                step: int = 32, group_opacity: float = 0.13, seed: int = 7) -> str:
+    """Endless falling-glyph columns, clipped to the panel — STEPPED, not smooth.
+
+    Film-authentic matrix rain jumps one glyph row at a time, and discrete
+    steps on a shared clock are also what keeps this cheap: between steps every
+    sampled value is constant, so the SVG raster doesn't repaint every frame
+    (continuous translates on ~30 columns pegged a core in testing). Columns
+    de-sync via whole-step negative begins and per-column glyph patterns, some
+    fall at half speed. Deterministic hash keeps daily re-renders diff-stable.
+    A paused timeline shows glyphs parked mid-fall — still fine as texture.
+    """
+    line = 18
+    n = height // line + 2
+    period = n * line
+    step_time = 0.42
+    cols = []
+    for i, x in enumerate(range(10, width - 6, step)):
+        h = i * 73 + seed * 131
+        speed = 1 + (h % 3 == 0)  # a third of the columns fall at half speed
+        dur = n * step_time * speed
+        begin = -(h % n) * step_time * speed
+        tspans = []
+        for j in range(2 * n):
+            c = RAIN_CHARS[(h + (j % n) * 29) % len(RAIN_CHARS)]
+            fo = max(0.10, 0.55 - (j % n) * (0.45 / n))
+            tspans.append(
+                f'<tspan x="{x}" y="{j * line - period}" fill-opacity="{fo:.2f}">{c}</tspan>'
+            )
+        offsets = ";".join(f"0 {k * line}" for k in range(n))
+        key_times = ";".join(f"{k / n:.4f}" for k in range(n))
+        cols.append(
+            f'<text font-size="13" fill="{GREEN}">' + "".join(tspans)
+            + f'<animateTransform attributeName="transform" type="translate" '
+              f'values="{offsets}" keyTimes="{key_times}" calcMode="discrete" '
+              f'dur="{dur:.2f}s" begin="{begin:.2f}s" repeatCount="indefinite"/></text>'
+        )
     return (
-        f'<animateTransform attributeName="transform" type="translate" '
-        f'begin="0.01s" dur="{total:.3f}s" values="0 -14;0 -14;0 0" '
-        f'keyTimes="0;{k:.4f};1" '
-        f'calcMode="spline" keySplines="0 0 1 1;0.16 0.84 0.32 1" fill="freeze"/>'
+        f'<g opacity="{group_opacity}" clip-path="url(#{clip_id})">'
+        + "".join(cols) + "</g>"
     )
 
 
@@ -92,9 +122,13 @@ def main() -> None:
         '<stop offset="0.5" stop-color="#39d353" stop-opacity="0.85"/>'
         '<stop offset="1" stop-color="#39d353" stop-opacity="0"/>'
         "</linearGradient>"
+        f'<clipPath id="panelclip"><rect x="1" y="1" width="{width - 2}" '
+        f'height="{height - 2}" rx="12"/></clipPath>'
         "</defs>",
         f'<rect x="1" y="1" width="{width - 2}" height="{height - 2}" rx="12" '
         f'fill="{BG}" stroke="{BORDER}"/>',
+        # the rain: behind everything, clipped to the rounded panel
+        matrix_rain(width, height, "panelclip"),
         # terminal titlebar; the green dot pulses like a recording light
         f'<circle cx="{PAD + 6}" cy="{TITLEBAR // 2 + 2}" r="6" fill="#ff5f56"/>',
         f'<circle cx="{PAD + 26}" cy="{TITLEBAR // 2 + 2}" r="6" fill="#ffbd2e"/>',
@@ -105,7 +139,7 @@ def main() -> None:
         f'~/{data["username"]} &#8250; contributions --last-year</text>',
     ]
 
-    # month labels appear as the rain front reaches their column
+    # month labels appear as the wave reaches their column
     week_month = {}
     for d in days:
         wk = d["week"]
@@ -129,26 +163,59 @@ def main() -> None:
             f'fill="{MUTED}">{name}{reveal(wd * ROW_STEP)}</text>'
         )
 
-    # the grid — matrix rain: columns sweep left to right, cells drop into place
+    # the grid — cells pop in (scale overshoot + green flash) as the wave
+    # sweeps; empty cells are slightly translucent so the rain peeks through
     for d in days:
-        cx = x0 + d["week"] * PITCH
-        cy = y0 + d["weekday"] * PITCH
+        cx = x0 + d["week"] * PITCH + HALF
+        cy = y0 + d["weekday"] * PITCH + HALF
         delay = d["week"] * COL_STEP + d["weekday"] * ROW_STEP
+        total = delay + POP_DUR
+        k1 = max(delay / total, 0.0001)
+        k2 = min((delay + 0.30) / total, 0.9999)
+        color = LEVELS[min(d["level"], 4)]
         n = d["count"]
         tip = f'{n} contribution{"" if n == 1 else "s"} on {d["date"]}'
-        anims = reveal(delay, RAIN_DUR) + drop(delay)
-        if d["level"] >= 3:  # bright cells keep breathing forever
-            stagger = (d["week"] * 7 + d["weekday"]) * 0.13 % 2.6
+        fo = ' fill-opacity="0.85"' if d["level"] == 0 else ""
+
+        anims = (
+            f'<animateTransform attributeName="transform" type="scale" '
+            f'begin="0.01s" dur="{total:.3f}s" values="0;0;1.35;1" '
+            f'keyTimes="0;{k1:.4f};{k2:.4f};1" calcMode="spline" '
+            f'keySplines="0 0 1 1;0.2 0.7 0.3 1;0.3 0 0.5 1" fill="freeze"/>'
+            f'<animate attributeName="fill" begin="0.01s" dur="{total:.3f}s" '
+            f'values="{FLASH};{FLASH};{color}" keyTimes="0;{k1:.4f};1" fill="freeze"/>'
+        )
+        if d["level"] >= 3:  # bright cells pulse briefly, then hold (cheap)
+            stagger = (d["week"] * 7 + d["weekday"]) * 0.13 % 4.7
             anims += (
-                f'<animate attributeName="opacity" values="1;0.7;1" dur="3.8s" '
+                f'<animate attributeName="opacity" values="1;0.72;1;1" '
+                f'keyTimes="0;0.09;0.18;1" dur="5.2s" '
                 f'begin="{SWEEP + stagger:.2f}s" repeatCount="indefinite"/>'
             )
+
+        # star glints twinkle forever on a deterministic subset of cells;
+        # short flash + long constant hold keeps the raster mostly idle
+        glint = ""
+        h = (d["week"] * 2654435761 + d["weekday"] * 40503) % 1000
+        if h < 200 and d["level"] >= 1:
+            gl_begin = 3.0 + (h % 87) / 10.0
+            gl_dur = 5.5 + (h % 40) / 10.0
+            glint = (
+                '<g opacity="0">'
+                '<path d="M0 -5.5 L1.3 -1.3 L5.5 0 L1.3 1.3 L0 5.5 L-1.3 1.3 '
+                'L-5.5 0 L-1.3 -1.3 Z" fill="#eaffef"/>'
+                f'<animate attributeName="opacity" values="0;0.95;0;0" '
+                f'keyTimes="0;0.08;0.16;1" dur="{gl_dur:.2f}s" begin="{gl_begin:.2f}s" '
+                f'repeatCount="indefinite"/></g>'
+            )
+
         parts.append(
-            f'<rect x="{cx}" y="{cy}" width="{CELL}" height="{CELL}" rx="3" '
-            f'fill="{LEVELS[min(d["level"], 4)]}"><title>{tip}</title>{anims}</rect>'
+            f'<g transform="translate({cx:.1f},{cy:.1f})">'
+            f'<rect x="-{HALF}" y="-{HALF}" width="{CELL}" height="{CELL}" rx="3" '
+            f'fill="{color}"{fo}><title>{tip}</title>{anims}</rect>{glint}</g>'
         )
 
-    # scan beam: first pass rides the rain front, then ghost-sweeps every 9s
+    # scan beam: first pass rides the wave, then ghost-sweeps every 9s
     beam_travel = grid_w + 120
     parts.append(
         f'<g><rect x="{x0 - 40}" y="{y0 - 4}" width="30" height="{grid_h + 8}" '
@@ -186,7 +253,6 @@ def main() -> None:
         f'<text x="{x0}" y="{fy}" font-size="13" fill="{GREEN}" '
         f'clip-path="url(#typeclip)">{total_text}</text>'
     )
-    # blinking block cursor lives forever at the end of the line
     parts.append(
         f'<rect x="{x0 + text_w + 5}" y="{fy - 12}" width="8" height="15" '
         f'fill="{GREEN}" opacity="0">'

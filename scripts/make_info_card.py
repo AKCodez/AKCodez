@@ -37,7 +37,45 @@ FIELDS = [
 PALETTE = ["#ff5f56", "#ffbd2e", "#27c93f", "#39d353", "#7ee787",
            "#58a6ff", "#bc8cff", "#e6edf3"]
 
+RAIN_CHARS = "0101010110ZEXA357F*+=-"  # XML-safe only: no < > &
+
 FONT = "ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace"
+
+
+def matrix_rain(width: int, height: int, clip_id: str,
+                step: int = 32, group_opacity: float = 0.10, seed: int = 3) -> str:
+    """Endless falling-glyph columns, clipped to the panel — STEPPED discrete
+    jumps on a shared clock (see heatmap script for why: film-authentic AND
+    keeps the raster idle between steps; smooth translates pegged a core)."""
+    line = 18
+    n = height // line + 2
+    period = n * line
+    step_time = 0.42
+    cols = []
+    for i, x in enumerate(range(10, width - 6, step)):
+        h = i * 73 + seed * 131
+        speed = 1 + (h % 3 == 0)
+        dur = n * step_time * speed
+        begin = -(h % n) * step_time * speed
+        tspans = []
+        for j in range(2 * n):
+            c = RAIN_CHARS[(h + (j % n) * 29) % len(RAIN_CHARS)]
+            fo = max(0.10, 0.55 - (j % n) * (0.45 / n))
+            tspans.append(
+                f'<tspan x="{x}" y="{j * line - period}" fill-opacity="{fo:.2f}">{c}</tspan>'
+            )
+        offsets = ";".join(f"0 {k * line}" for k in range(n))
+        key_times = ";".join(f"{k / n:.4f}" for k in range(n))
+        cols.append(
+            f'<text font-size="13" fill="{GREEN}">' + "".join(tspans)
+            + f'<animateTransform attributeName="transform" type="translate" '
+              f'values="{offsets}" keyTimes="{key_times}" calcMode="discrete" '
+              f'dur="{dur:.2f}s" begin="{begin:.2f}s" repeatCount="indefinite"/></text>'
+        )
+    return (
+        f'<g opacity="{group_opacity}" clip-path="url(#{clip_id})">'
+        + "".join(cols) + "</g>"
+    )
 
 
 def reveal(delay: float, dur: float = 0.4) -> str:
@@ -62,8 +100,11 @@ def main() -> None:
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}" '
         f'viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label="AriaCodez terminal info card">',
         f"<style>text {{ font-family: {FONT}; }}</style>",
+        f'<defs><clipPath id="cardclip"><rect x="1" y="1" width="{WIDTH - 2}" '
+        f'height="{HEIGHT - 2}" rx="12"/></clipPath></defs>',
         f'<rect x="1" y="1" width="{WIDTH - 2}" height="{HEIGHT - 2}" rx="12" '
         f'fill="{BG}" stroke="{BORDER}"/>',
+        matrix_rain(WIDTH, HEIGHT, "cardclip"),
         f'<circle cx="{PAD + 4}" cy="{TITLEBAR // 2 + 2}" r="6" fill="#ff5f56"/>',
         f'<circle cx="{PAD + 24}" cy="{TITLEBAR // 2 + 2}" r="6" fill="#ffbd2e"/>',
         f'<circle cx="{PAD + 44}" cy="{TITLEBAR // 2 + 2}" r="6" fill="#27c93f">'
