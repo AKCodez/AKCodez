@@ -10,6 +10,12 @@
 </tr>
 </table>
 
+<p>
+<a href="https://www.instagram.com/ariacodez/">instagram</a> ·
+<a href="https://www.tiktok.com/@ariacodez">tiktok</a> ·
+<a href="https://www.youtube.com/@AriaCodez">youtube</a>
+</p>
+
 <p><a href="https://ariacodez.ai/resources/animated-github-profile"><b>how i built this</b></a> — no widgets, no tokens, no third-party stat services.</p>
 
 </div>

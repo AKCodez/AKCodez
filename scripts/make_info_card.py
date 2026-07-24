@@ -16,11 +16,11 @@ FG, MUTED, GREEN = "#e6edf3", "#8b949e", "#7ee787"
 WIDTH, HEIGHT = 480, 348
 PAD = 22
 TITLEBAR = 34
-LINE_H = 25
+LINE_H = 24
 FONT_SIZE = 13
 CHAR_W = 7.8
 
-HEADER = "aria@github"
+HEADER = "AriaCodez@github"
 FIELDS = [
     ("OS",     "Windows 11 · PowerShell 7"),
     ("Host",   "ariacodez.ai"),
@@ -29,6 +29,7 @@ FIELDS = [
     ("Stack",  "TypeScript · Python · Next.js · Postgres"),
     ("Ships",  "viral engines · trend radars · DM funnels"),
     ("Focus",  "reverse-engineering the algorithm"),
+    ("Social", "@AriaCodez · IG / TikTok / YouTube"),
 ]
 PALETTE = ["#ff5f56", "#ffbd2e", "#27c93f", "#39d353", "#7ee787",
            "#58a6ff", "#bc8cff", "#e6edf3"]
@@ -61,7 +62,7 @@ def main() -> None:
         '<animate attributeName="opacity" values="1;0.35;1" dur="2.2s" '
         'repeatCount="indefinite"/></circle>',
         f'<text x="{PAD + 64}" y="{TITLEBAR // 2 + 6}" font-size="12" fill="{MUTED}">'
-        "aria@github: ~ (fetch)</text>",
+        "AriaCodez@github: ~ (fetch)</text>",
     ]
 
     y = TITLEBAR + 20 + FONT_SIZE
@@ -99,15 +100,16 @@ def main() -> None:
             f'fill="{color}">{reveal(delay + i * 0.06)}</rect>'
         )
 
-    # prompt with an eternally blinking cursor
-    y += LINE_H + 3
+    # prompt with an eternally blinking cursor, anchored to the card's bottom
+    # edge so it lines up with the bottom of hackerman.gif next door
+    y = HEIGHT - 14
     delay += 0.5
-    prompt = f'<tspan fill="{GREEN}">aria@github</tspan><tspan fill="{MUTED}"> ~ $</tspan>'
+    prompt = f'<tspan fill="{GREEN}">{HEADER}</tspan><tspan fill="{MUTED}"> ~ $</tspan>'
     parts.append(
         f'<text x="{PAD}" y="{y}" font-size="{FONT_SIZE}" xml:space="preserve">'
         f"{prompt}{reveal(delay)}</text>"
     )
-    cursor_x = PAD + int(15 * CHAR_W) + 6
+    cursor_x = PAD + int((len(HEADER) + 4) * CHAR_W) + 6
     parts.append(
         f'<rect x="{cursor_x}" y="{y - 12}" width="8" height="15" fill="{GREEN}" '
         f'opacity="0"><animate attributeName="opacity" values="0;1;1;0;0" '
